@@ -1,0 +1,62 @@
+spring:
+  datasource:
+    url: jdbc:postgresql://127.0.0.1:5432/bztiotdb
+    username: postgres
+    password: 2005
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: false          # set to true for debugging queries
+  application:
+    name: bztiot
+
+mqtt:
+  broker:
+    url: tcp://test.mosquitto.org:1883
+  client:
+    id: springboot-subscriber
+  topic: iot/+/temperature
+
+# ── Zero Trust Engine Configuration ──────────────────────────────────────────
+# These values implement the paper's trust formula: T = w1*I + w2*B + w3*H + w4*S
+# Weights MUST sum to 1.0. Adjust to experiment with different trust profiles.
+#
+# Starting weights for the prototype (not experimentally validated):
+#   Identity     (w1): 35% — authentication is the strongest single signal
+#   Behavioral   (w2): 30% — what the device is doing right now matters a lot
+#   Historical   (w3): 15% — past record is relevant but decays over time
+#   Security State(w4): 20% — current firmware and revocation status
+trust:
+  weight:
+    identity: 0.35
+    behavioral: 0.30
+    historical: 0.15
+    security-state: 0.20
+
+  # Policy thresholds — map trust score ranges to access decisions.
+  # Change these to experiment with stricter or more lenient policies.
+  # Edge cases: score exactly equal to threshold uses the HIGHER (more permissive) category.
+  threshold:
+    allow: 80          # score >= 80 → ALLOW
+    restrict: 60       # score >= 60 → RESTRICT (below allow)
+    quarantine: 40     # score >= 40 → QUARANTINE (below restrict)
+                       # score <  40 → DENY
+
+  # Behavior monitoring limits
+  behavior:
+    # Maximum sensor messages a device may publish per minute.
+    # Normal Wokwi firmware publishes once every 5 seconds → 12/min.
+    # 20/min gives headroom for reconnects before flagging abuse.
+    max-messages-per-minute: 20
+
+    # Time window (in minutes) over which security violations are counted
+    # for the historical trust factor.
+    violation-window-minutes: 60
+
+    # If a device accumulates this many violations in the window,
+    # the historical score drops to 0.
+    max-violations-in-window: 5
+
+    # Challenge expiry (seconds) — also set in AuthenticationService.
+    # Defined here so it can be tuned without recompiling.
+    challenge-ttl-seconds: 60
