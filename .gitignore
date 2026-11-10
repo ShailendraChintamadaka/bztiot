@@ -32,6 +32,11 @@ build/
 ### VS Code ###
 .vscode/
 
+### Frontend — never commit these ###
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+
 ### Security — NEVER commit these ###
 # Private keys must stay on the device, never in the repository.
 device_private.pem

@@ -35,7 +35,7 @@
 
 #include <WiFi.h>
 #include <PubSubClient.h>
-#include <HTTPClient.h>          // NEW: for challenge-response HTTP calls
+#include <HTTPClient.h>          // for challenge-response HTTP calls
 #include <DHT.h>
 #include "time.h"
 #include "mbedtls/md.h"
@@ -55,9 +55,11 @@ const char* ssid     = "Wokwi-GUEST";
 const char* password = "";
 
 // ─── CHANGE THIS: paste your ngrok URL (no trailing slash) ────────────────
-//   Example: "https://abc123.ngrok-free.app"
+//   ⚠️  Use http:// NOT https:// — Wokwi cloud simulator cannot do TLS.
+//   ngrok exposes both HTTP and HTTPS; use the HTTP version.
+//   Example: "http://abc123.ngrok-free.app"
 //   Get it by running:  ngrok http 8080
-const char* BACKEND_URL = "https://3717-103-88-239-114.ngrok-free.app";
+const char* BACKEND_URL = "http://cb69-103-88-239-114.ngrok-free.app";
 
 // ─── MQTT config ──────────────────────────────────────────────────────────
 const char* mqtt_server = "test.mosquitto.org";
@@ -340,13 +342,21 @@ bool authenticate() {
 
     HTTPClient http;
 
+    // ── Use plain WiFiClient (no SSL). The BACKEND_URL must start with http://
+    //    Wokwi's cloud simulator cannot complete TLS handshakes to external hosts
+    //    (WiFiClientSecure fails). We expose the backend over plain HTTP via ngrok's
+    //    HTTP tunnel (http://xyz.ngrok-free.app → localhost:8080). No SSL needed
+    //    here because the data is a nonce + a public-key-verified signature — there
+    //    is no secret in transit. ─────────────────────────────────────────────────
+    WiFiClient plainClient;
+
     // ── Step 1: Request a challenge ────────────────────────────────────────
     String challengeUrl = String(BACKEND_URL)
                         + "/api/devices/auth/challenge/"
                         + String(deviceId);
 
     Serial.println("[AUTH] Requesting challenge from: " + challengeUrl);
-    http.begin(challengeUrl);
+    http.begin(plainClient, challengeUrl);
     http.addHeader("Content-Type", "application/json");
     // ngrok requires this header to avoid the browser-redirect interstitial
     http.addHeader("ngrok-skip-browser-warning", "true");
@@ -406,7 +416,7 @@ bool authenticate() {
     String verifyUrl = String(BACKEND_URL) + "/api/devices/auth/verify";
     Serial.println("[AUTH] Sending verify request to: " + verifyUrl);
 
-    http.begin(verifyUrl);
+    http.begin(plainClient, verifyUrl);
     http.addHeader("Content-Type", "application/json");
     http.addHeader("ngrok-skip-browser-warning", "true");
 
